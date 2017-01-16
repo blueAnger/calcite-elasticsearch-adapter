@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "defaultSchema": "test",
+  "schemas": [
+    {
+      "name": "test",
+      "type": "custom",
+      "factory": "com.thomas.sql.es.ElasticsearchSchemaFactory",
+      "operand": {
+        "addresses": "localhost:9300",
+        "cluster": "thomas-es-cluster",
+        "index": "test"
+      }
+    }
+  ]
+}
