@@ -1,0 +1,3 @@
+an adapter of elasticsearch 5.0.1 for calcite based on old adapter(elasticsearch version 2.3.x)
+New hand. Not quite good work.
+Supporting basic sql query.
