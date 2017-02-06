@@ -1,5 +1,7 @@
-package com.thomas.sql.es;
+package com.thomas.sql.es.rule;
 
+import com.thomas.sql.es.ElasticsearchRelNode;
+import com.thomas.sql.es.ElasticsearchTable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
@@ -34,8 +36,8 @@ public class ElasticsearchAggregate extends Aggregate implements ElasticsearchRe
     {
         implementor.visitChild(0, getInput());
         List<AggregateCall> aggCallList = getAggCallList();
-        ElasticsearchTable esTable = implementor.elasticsearchTable;
-        List<RelDataTypeField> fieldList = esTable.rowType.getFieldList();
+        ElasticsearchTable esTable = implementor.getElasticsearchTable();
+        List<RelDataTypeField> fieldList = esTable.getRowType().getFieldList();
         for(AggregateCall call : aggCallList)
         {
             SqlAggFunction function = call.getAggregation();

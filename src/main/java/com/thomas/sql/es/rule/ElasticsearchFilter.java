@@ -1,7 +1,8 @@
-package com.thomas.sql.es;
+package com.thomas.sql.es.rule;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.thomas.sql.es.ElasticsearchRelNode;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
@@ -198,6 +199,6 @@ public class ElasticsearchFilter extends Filter implements ElasticsearchRelNode
         //always visit the child node (input) first
         implementor.visitChild(0, getInput());
         QueryBuilder queryBuilder = translate();
-        implementor.elasticsearchTable.addQueryBuilder(queryBuilder);
+        implementor.getElasticsearchTable().addQueryBuilder(queryBuilder);
     }
 }

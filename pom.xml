@@ -11,9 +11,6 @@
     <properties>
         <elasticsearch.version>5.0.1</elasticsearch.version>
         <log4j2.version>2.6.2</log4j2.version>
-        <!--<commons-lang3.version>3.3.2</commons-lang3.version>-->
-        <!--<commons-io.version>2.4</commons-io.version>-->
-        <!--<commons-configuration.version>1.6</commons-configuration.version>-->
         <mysql-connector-java.version>5.1.35</mysql-connector-java.version>
         <junit.version>4.11</junit.version>
         <calcite.version>1.10.0</calcite.version>
@@ -61,18 +58,6 @@
             <artifactId>log4j-slf4j-impl</artifactId>
             <version>${log4j2.version}</version>
         </dependency>
-
-        <!--<dependency>-->
-            <!--<groupId>org.apache.commons</groupId>-->
-            <!--<artifactId>commons-lang3</artifactId>-->
-            <!--<version>${commons-lang3.version}</version>-->
-        <!--</dependency>-->
-
-        <!--<dependency>-->
-            <!--<groupId>commons-io</groupId>-->
-            <!--<artifactId>commons-io</artifactId>-->
-            <!--<version>${commons-io.version}</version>-->
-        <!--</dependency>-->
 
         <dependency>
             <groupId>junit</groupId>

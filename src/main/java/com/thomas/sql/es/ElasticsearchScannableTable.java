@@ -30,7 +30,7 @@ public class ElasticsearchScannableTable extends ElasticsearchTable implements S
             @Override
             public Iterator<Object[]> iterator() {
                 SearchRequestBuilder searchRequestBuilder = client.prepareSearch(index);
-                SearchResponse searchResponse = searchRequestBuilder.setTypes(type).setFrom(0).setSize(limit).get();
+                SearchResponse searchResponse = searchRequestBuilder.setTypes(type).get();
                 List<Object[]> resultList = new ArrayList<>();
                 List<String> fieldNames = rowType.getFieldNames();
                 for(SearchHit hit : searchResponse.getHits().getHits())

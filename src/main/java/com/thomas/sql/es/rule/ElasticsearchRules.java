@@ -1,4 +1,4 @@
-package com.thomas.sql.es;
+package com.thomas.sql.es.rule;
 
 import org.apache.calcite.plan.RelOptRule;
 
@@ -10,7 +10,7 @@ public class ElasticsearchRules
     public static <T extends RelOptRule> List<T> createRules(String ... rules)
     {
         if(rules == null || rules.length == 0)
-            rules = new String[]{RuleType.ALL.toString()};
+            throw new IllegalArgumentException("invalid rules: empty");
 
         List<T> resultList = new ArrayList<>(rules.length);
         for(String rule : rules)
@@ -25,10 +25,10 @@ public class ElasticsearchRules
         {
             case FILTER:
                 return (T) new ElasticsearchFilterRule();
-            case PROJECT:
-                return (T) new ElasticsearchProjectRule();
             case AGGREGATE:
                 return (T) new ElasticsearchAggregateRule();
+            case SORT:
+                return (T) new ElasticsearchSortRule();
             default:break;
         }
         return null;
@@ -36,10 +36,8 @@ public class ElasticsearchRules
 
     enum RuleType
     {
-        ALL,
         FILTER,
         SORT,
-        PROJECT,
         AGGREGATE
     }
 }

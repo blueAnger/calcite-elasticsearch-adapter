@@ -16,7 +16,7 @@ public class SQLTest
 {
     private String[] sqlArray = {
             "select max(age) as maxAge, min(age) as minAge, count(\"name.raw\") as cnt from person",
-            "select * from person where name = 'name2'"
+            "select * from person order by age desc offset 2 rows fetch next 10 rows only"
     };
 
     private Properties properties = new Properties();

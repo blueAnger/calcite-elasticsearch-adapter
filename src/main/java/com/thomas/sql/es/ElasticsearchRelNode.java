@@ -24,5 +24,15 @@ public interface ElasticsearchRelNode extends RelNode
             assert ordinal == 0;
             ((ElasticsearchRelNode) input).implement(this);
         }
+
+        public RelOptTable getTable()
+        {
+            return table;
+        }
+
+        public ElasticsearchTable getElasticsearchTable()
+        {
+            return elasticsearchTable;
+        }
     }
 }

@@ -1,5 +1,6 @@
-package com.thomas.sql.es;
+package com.thomas.sql.es.rule;
 
+import com.thomas.sql.es.ElasticsearchRelNode;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;

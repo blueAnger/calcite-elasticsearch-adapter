@@ -1,5 +1,6 @@
 package com.thomas.sql.es;
 
+import com.thomas.sql.es.rule.ElasticsearchRules;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
@@ -24,7 +25,7 @@ public class ElasticsearchTableScan extends TableScan implements ElasticsearchRe
     {
         //add the specific rule to do something about elasticsearch to optimize
         planner.addRule(new ES2EnumerableConverterRule());
-        rules = ElasticsearchRules.createRules("filter", "aggregate");
+        rules = ElasticsearchRules.createRules("filter", "aggregate", "sort");
         for(RelOptRule rule : rules)
             planner.addRule(rule);
     }

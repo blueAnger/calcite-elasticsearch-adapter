@@ -16,6 +16,9 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.NumericMetricsAggregation;
+import org.elasticsearch.search.sort.SortBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 
 import java.io.IOException;
 import java.util.*;
@@ -23,31 +26,16 @@ import java.util.function.Function;
 
 public class ElasticsearchTable extends AbstractTable
 {
-    //本来是想对SQL投影进行全面的解析
-    //但考虑到普通的投影（直接字段引用、字段值简单运算如: age + 10）是在SearchResponse的source基础上进行的
-    //还不如让calcite去做这部分工作
-    protected final List<ProjectField> projectFieldList = new ArrayList<>();
-    public void addProjectField(ProjectField.ProjectFieldType type, int index, String displayName)
-    {
-        projectFieldList.add(new ProjectField(type, index, displayName));
-    }
-    public static class ProjectField
-    {
-        enum ProjectFieldType
-        {
-            NORMAL,AGGREGATION,FUNCTION
-        }
-
-        ProjectFieldType type;
-        int index;
-        String name;
-
-        public ProjectField(ProjectFieldType type, int index, String name)
-        {
-            this.type = type;
-            this.index = index;
-            this.name = name;
-        }
+    private static Map<Class, Function<String, Object>> CONVERTERS = new HashMap<>();
+    static {
+        CONVERTERS.put(String.class, s -> s);
+        CONVERTERS.put(Integer.class, Integer::parseInt);
+        CONVERTERS.put(Float.class, Float::parseFloat);
+        CONVERTERS.put(Double.class, Double::parseDouble);
+        CONVERTERS.put(Boolean.class, Boolean::parseBoolean);
+        CONVERTERS.put(Short.class, Short::parseShort);
+        CONVERTERS.put(Byte.class, Byte::parseByte);
+        CONVERTERS.put(Long.class, Long::parseLong);
     }
 
     protected TransportClient client;
@@ -55,10 +43,19 @@ public class ElasticsearchTable extends AbstractTable
     protected String type;
     protected RelDataType rowType;
     protected final List<QueryBuilder> queryBuilderList = new ArrayList<>();
-    /**
-     * SQL投影可以涉及到聚合
-     */
     protected final List<Pair<AggregationBuilder, Class>> aggregationBuilderList = new ArrayList<>();
+    protected final List<SortBuilder> sortBuilderList = new ArrayList<>();
+    protected int searchOffset, searchSize;
+
+    public void setSearchOffset(int searchOffset)
+    {
+        this.searchOffset = searchOffset;
+    }
+
+    public void setSearchSize(int searchSize)
+    {
+        this.searchSize = searchSize;
+    }
 
     public void addQueryBuilder(QueryBuilder queryBuilder)
     {
@@ -70,7 +67,10 @@ public class ElasticsearchTable extends AbstractTable
         aggregationBuilderList.add(Pair.of(aggregationBuilder, cls));
     }
 
-    protected final int limit = 100;
+    public void addSortBuilder(String field, SortOrder order)
+    {
+        sortBuilderList.add(SortBuilders.fieldSort(field).order(order));
+    }
 
     public ElasticsearchTable(TransportClient client, String index, String type) {
         this.client = client;
@@ -90,14 +90,20 @@ public class ElasticsearchTable extends AbstractTable
         return rowType;
     }
 
+    public RelDataType getRowType()
+    {
+        return rowType;
+    }
+
     /**
-     * 读取elasticsearch的mapping, 组装得到RelDataType
-     * @param typeFactory 创建RelDataType的工厂实例
-     * @return 表征行类型的RelDataType实例
-     * @throws IOException 如果从elasticsearch获取mapping时，json解析出错，就会抛该异常
+     * parse elasticsearch mapping to get RelDataType
+     * @param typeFactory
+     * @return RelDataType instance representing the "table schema"
+     * @throws IOException throws when something wrong with json parsing
      */
     @SuppressWarnings("unchecked")
-    public RelDataType getRowTypeFromEs(RelDataTypeFactory typeFactory) throws IOException {
+    public RelDataType getRowTypeFromEs(RelDataTypeFactory typeFactory) throws IOException
+    {
         RelDataTypeFactory.FieldInfoBuilder builder = typeFactory.builder();
         GetMappingsResponse getMappingsResponse = client.admin().indices().prepareGetMappings(index).get();
         MappingMetaData typeMapping = getMappingsResponse.getMappings().get(index).get(type);
@@ -123,7 +129,7 @@ public class ElasticsearchTable extends AbstractTable
                 if(type == null) throw new IllegalStateException(String.format("type of elasticsearch field '%s' is null", name));
                 builder.add(new RelDataTypeFieldImpl(name, index++, typeFactory.createJavaType(ES2JavaTypeConverter.toJavaType(type))));
 
-                //该字段可能拥有fields选项
+                //multi-field, that means containing 'fields' attribute
                 Map<String, Object> moreFields = fieldMap.get("fields") != null ? (Map<String, Object>) fieldMap.get("fields") : null;
                 if(moreFields != null) mapStack.push(Pair.of(name, moreFields));
             }
@@ -143,10 +149,16 @@ public class ElasticsearchTable extends AbstractTable
         }
         for(Pair<AggregationBuilder, Class> pair : aggregationBuilderList)
             searchRequestBuilder.addAggregation(pair.left);
-        SearchResponse searchResponse = searchRequestBuilder.get();
+        for(SortBuilder sortBuilder : sortBuilderList)
+            searchRequestBuilder.addSort(sortBuilder);
+        if(searchOffset >= 0)
+            searchRequestBuilder.setFrom(searchOffset);
+        if(searchSize > 0)
+            searchRequestBuilder.setSize(searchSize);
 
+        SearchResponse searchResponse = searchRequestBuilder.get();
         List<Object[]> resultList = new ArrayList<>();
-        //涉及到聚合操作，只会有一行结果返回
+        //aggregation, only one row to return
         if(aggregationBuilderList.size() > 0)
         {
             List<Object> rowObj = new ArrayList<>();
@@ -170,7 +182,7 @@ public class ElasticsearchTable extends AbstractTable
                 List<Object> rowObj = new ArrayList<>();
                 for(RelDataTypeField field : fieldList)
 //                    rowObj.add(convert(field.getType(), valueMap.get(field.getName().toLowerCase()).toString()));
-                //考虑到类似于name.raw这样的elasticsearch的field，将逻辑改成如下
+                //considering multi-field
                 {
                     Object obj = valueMap.get(field.getName().toLowerCase());
                     if(obj != null)
@@ -195,37 +207,4 @@ public class ElasticsearchTable extends AbstractTable
         return CONVERTERS.getOrDefault(javaClass, s -> s).apply(originValue);
     }
 
-    private static Map<Class, Function<String, Object>> CONVERTERS = new HashMap<>();
-    static {
-        CONVERTERS.put(String.class, s -> s);
-        CONVERTERS.put(Integer.class, Integer::parseInt);
-        CONVERTERS.put(Float.class, Float::parseFloat);
-        CONVERTERS.put(Double.class, Double::parseDouble);
-        CONVERTERS.put(Boolean.class, Boolean::parseBoolean);
-        CONVERTERS.put(Short.class, Short::parseShort);
-        CONVERTERS.put(Byte.class, Byte::parseByte);
-        CONVERTERS.put(Long.class, Long::parseLong);
-    }
-
-    //将一个文本，按照其字段类型，转换成合适的值
-//    private Object convert(Class javaClass, String originValue)
-//    {
-//        if(javaClass.equals(String.class))
-//            return originValue;
-//        else if(javaClass.equals(Integer.class))
-//            return Integer.parseInt(originValue);
-//        else if(javaClass.equals(Float.class))
-//            return Float.parseFloat(originValue);
-//        else if(javaClass.equals(Double.class))
-//            return Double.parseDouble(originValue);
-//        else if(javaClass.equals(Boolean.class))
-//            return Boolean.parseBoolean(originValue);
-//        else if(javaClass.equals(Short.class))
-//            return Short.parseShort(originValue);
-//        else if(javaClass.equals(Byte.class))
-//            return Byte.parseByte(originValue);
-//        else if(javaClass.equals(Long.class))
-//            return Long.parseLong(originValue);
-//        return originValue;
-//    }
 }
