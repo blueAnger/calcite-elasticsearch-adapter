@@ -4,12 +4,11 @@ import com.thomas.sql.es.util.CalciteUtil;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 public class SQLTest
@@ -38,15 +37,17 @@ public class SQLTest
     @Test
     public void testSelect() {
         long startTime = System.currentTimeMillis();
-        CalciteUtil.execute(properties, sqlArray[1], (Function<ResultSet, Void>) resultSet -> {
+        String sql = sqlArray[0];
+        System.out.println("sql: " + sql);
+        CalciteUtil.execute(properties, sql, (Function<ResultSet, Void>) resultSet -> {
             try {
                 ResultSetMetaData metaData = resultSet.getMetaData();
                 int count = metaData.getColumnCount();
                 while (resultSet.next())
                 {
                     for(int i = 1; i <= count; ++i)
-                        System.out.print(metaData.getColumnLabel(i) + ": " +
-                                (resultSet.getObject(i) != null ? resultSet.getObject(i).toString() : "null") + " ");
+                        System.out.print(metaData.getColumnLabel(i).toLowerCase() + ": " +
+                                (resultSet.getObject(i) != null ? resultSet.getObject(i).toString() : "null") + "    ");
                     System.out.println();
                 }
                 long endTime = System.currentTimeMillis();
@@ -64,7 +65,11 @@ public class SQLTest
         ExecutorService executorService = Executors.newFixedThreadPool(sqlArray.length);
         for(String sql : sqlArray)
             executorService.execute(new QueryRunnable(properties, sql));
-        executorService.shutdown();
+        try {
+            executorService.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     public static class QueryRunnable implements Runnable
@@ -86,16 +91,20 @@ public class SQLTest
                 try {
                     ResultSetMetaData metaData = resultSet.getMetaData();
                     int count = metaData.getColumnCount();
-                    while (resultSet.next())
-                    {
-                        for(int i = 1; i <= count; ++i)
-                            System.out.print(Thread.currentThread().getName() + " ===> " + metaData.getColumnLabel(i) + ": " +
-                                    (resultSet.getObject(i) != null ? resultSet.getObject(i).toString() : "null") + " ");
+                    synchronized (SQLTest.class) {
+                        System.out.println(Thread.currentThread().getName() + ", sql: " + sql);
+                        while (resultSet.next()) {
+                            for (int i = 1; i <= count; ++i)
+                                System.out.print(metaData.getColumnLabel(i).toLowerCase() + ": " +
+                                        (resultSet.getObject(i) != null ? resultSet.getObject(i).toString() : "null") + "    ");
+                            System.out.println();
+                        }
+                        long endTime = System.currentTimeMillis();
+                        System.out.println("Time: " + (endTime - startTime) + " ms");
+                        System.out.println();
                         System.out.println();
                     }
-                    long endTime = System.currentTimeMillis();
-                    System.out.println("Time: " + (endTime - startTime) + " ms");
-                } catch (SQLException e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
                 return null;
